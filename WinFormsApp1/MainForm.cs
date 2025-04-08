@@ -770,7 +770,7 @@ namespace ADManager
             domainControllerTextBox = new TextBox
             {
                 Width = 200,
-                Text = "192.1.3.6",
+                Text = "",
                 BorderStyle = BorderStyle.FixedSingle
             };
             domainControllerPanel.Controls.Add(domainControllerLabel);
@@ -794,7 +794,7 @@ namespace ADManager
             baseDnTextBox = new TextBox
             {
                 Width = 200,
-                Text = "DC=mhp,DC=net",
+                Text = "DC=,DC=",
                 BorderStyle = BorderStyle.FixedSingle
             };
             baseDnPanel.Controls.Add(baseDnLabel);
