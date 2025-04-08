@@ -12,11 +12,15 @@ namespace ADManager
         private ActiveDirectoryService? _adService;
         private UserManagementViewModel? _userManagementVM;
         private OUViewModel? _ouVM;
+        private TextBox? _surnameTextBox;
+        private TextBox? _givenNameTextBox;
+        private TextBox? _displayNameTextBox;
+        private ComboBox? _displayNameOrderComboBox;
 
         public MainForm()
         {
             StartPosition = FormStartPosition.CenterScreen; // Окно открывается по центру экрана
-            MinimumSize = new Size(600, 800); // Минимальный размер окна
+            MinimumSize = new Size(600, 700); // Минимальный размер окна
             AutoSize = true; // Автоматическая подстройка размера
             BackColor = Color.FromArgb(245, 245, 245); // Светлый фон
             ShowLoginForm();
@@ -209,14 +213,14 @@ namespace ADManager
                 ForeColor = Color.FromArgb(66, 66, 66),
                 Margin = new Padding(0, 5, 10, 0)
             };
-            var surnameTextBox = new TextBox
+            _surnameTextBox = new TextBox
             {
                 Width = 300,
                 Font = new Font("Segoe UI", 10),
                 BorderStyle = BorderStyle.FixedSingle
             };
             surnamePanel.Controls.Add(surnameLabel);
-            surnamePanel.Controls.Add(surnameTextBox);
+            surnamePanel.Controls.Add(_surnameTextBox);
             flowPanel.Controls.Add(surnamePanel);
 
             var givenNamePanel = new FlowLayoutPanel
@@ -234,14 +238,14 @@ namespace ADManager
                 ForeColor = Color.FromArgb(66, 66, 66),
                 Margin = new Padding(0, 5, 10, 0)
             };
-            var givenNameTextBox = new TextBox
+            _givenNameTextBox = new TextBox
             {
                 Width = 300,
                 Font = new Font("Segoe UI", 10),
                 BorderStyle = BorderStyle.FixedSingle
             };
             givenNamePanel.Controls.Add(givenNameLabel);
-            givenNamePanel.Controls.Add(givenNameTextBox);
+            givenNamePanel.Controls.Add(_givenNameTextBox);
             flowPanel.Controls.Add(givenNamePanel);
 
             var initialsPanel = new FlowLayoutPanel
@@ -309,15 +313,44 @@ namespace ADManager
                 ForeColor = Color.FromArgb(66, 66, 66),
                 Margin = new Padding(0, 5, 10, 0)
             };
-            var displayNameTextBox = new TextBox
+            _displayNameTextBox = new TextBox
             {
                 Width = 300,
                 Font = new Font("Segoe UI", 10),
                 BorderStyle = BorderStyle.FixedSingle
             };
             displayNamePanel.Controls.Add(displayNameLabel);
-            displayNamePanel.Controls.Add(displayNameTextBox);
+            displayNamePanel.Controls.Add(_displayNameTextBox);
             flowPanel.Controls.Add(displayNamePanel);
+
+            // Панель для выбора порядка отображения
+            var displayNameOrderPanel = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                Margin = new Padding(0, 0, 0, 10)
+            };
+            var displayNameOrderLabel = new Label
+            {
+                Text = "Порядок отображения:",
+                Width = 150,
+                Font = new Font("Segoe UI", 10),
+                ForeColor = Color.FromArgb(66, 66, 66),
+                Margin = new Padding(0, 5, 10, 0)
+            };
+            _displayNameOrderComboBox = new ComboBox
+            {
+                Width = 150,
+                Font = new Font("Segoe UI", 10),
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            _displayNameOrderComboBox.Items.Add("Фамилия Имя");
+            _displayNameOrderComboBox.Items.Add("Имя Фамилия");
+            _displayNameOrderComboBox.SelectedIndex = 0; // По умолчанию "Фамилия Имя"
+            displayNameOrderPanel.Controls.Add(displayNameOrderLabel);
+            displayNameOrderPanel.Controls.Add(_displayNameOrderComboBox);
+            flowPanel.Controls.Add(displayNameOrderPanel);
 
             var descriptionPanel = new FlowLayoutPanel
             {
@@ -469,6 +502,27 @@ namespace ADManager
 
             panel.Controls.Add(flowPanel);
 
+            // Метод для обновления поля "Отображаемое имя"
+            void UpdateDisplayName()
+            {
+                if (_surnameTextBox == null || _givenNameTextBox == null || _displayNameTextBox == null || _displayNameOrderComboBox == null)
+                    return;
+
+                string surname = _surnameTextBox.Text.Trim();
+                string givenName = _givenNameTextBox.Text.Trim();
+                bool surnameFirst = _displayNameOrderComboBox.SelectedIndex == 0; // true: Фамилия Имя, false: Имя Фамилия
+
+                if (string.IsNullOrEmpty(surname) && string.IsNullOrEmpty(givenName))
+                {
+                    _displayNameTextBox.Text = string.Empty;
+                    return;
+                }
+
+                _displayNameTextBox.Text = surnameFirst
+                    ? $"{surname} {givenName}".Trim()
+                    : $"{givenName} {surname}".Trim();
+            }
+
             // Обработчики событий
             searchButton.Click += (s, e) =>
             {
@@ -481,8 +535,8 @@ namespace ADManager
 
                 var user = _userManagementVM.CurrentUser!;
                 loginTextBox.Text = user.SAMAccountName;
-                surnameTextBox.Text = user.Surname;
-                givenNameTextBox.Text = user.GivenName;
+                _surnameTextBox!.Text = user.Surname;
+                _givenNameTextBox!.Text = user.GivenName;
                 initialsTextBox.Text = user.Initials;
                 titleTextBox.Text = user.Title;
                 descriptionTextBox.Text = user.Description;
@@ -491,38 +545,42 @@ namespace ADManager
                 emailTextBox.Text = user.Email;
                 webPageTextBox.Text = user.WebPage;
 
-                // Автоматическое обновление DisplayName на основе SAMAccountName, если оно пустое
+                // Устанавливаем DisplayName
                 if (string.IsNullOrEmpty(user.DisplayName))
                 {
-                    user.DisplayName = user.SAMAccountName; // Или можно использовать формат, например: $"{user.GivenName} {user.Surname}"
-                    displayNameTextBox.Text = user.DisplayName;
-
-                    // Сохраняем обновленное DisplayName в Active Directory
-                    var updatedUser = new User
-                    {
-                        DistinguishedName = user.DistinguishedName,
-                        DisplayName = user.DisplayName
-                    };
-                    var (updateSuccess, updateError) = _userManagementVM.SaveChanges(updatedUser);
-                    if (!updateSuccess)
-                    {
-                        MessageBox.Show(updateError, "Ошибка при обновлении DisplayName", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    }
+                    UpdateDisplayName(); // Если DisplayName пустое, формируем его на основе порядка
                 }
                 else
                 {
-                    displayNameTextBox.Text = user.DisplayName;
+                    _displayNameTextBox!.Text = user.DisplayName;
                 }
+            };
+
+            // Обработчик изменения порядка отображения
+            _displayNameOrderComboBox!.SelectedIndexChanged += (s, e) =>
+            {
+                UpdateDisplayName();
+            };
+
+            // Обработчики изменения текста в полях "Фамилия" и "Имя"
+            _surnameTextBox!.TextChanged += (s, e) =>
+            {
+                UpdateDisplayName();
+            };
+
+            _givenNameTextBox!.TextChanged += (s, e) =>
+            {
+                UpdateDisplayName();
             };
 
             saveButton.Click += (s, e) =>
             {
                 var updatedUser = new User
                 {
-                    Surname = surnameTextBox.Text,
-                    GivenName = givenNameTextBox.Text,
+                    Surname = _surnameTextBox!.Text,
+                    GivenName = _givenNameTextBox!.Text,
                     Initials = initialsTextBox.Text,
-                    DisplayName = displayNameTextBox.Text,
+                    DisplayName = _displayNameTextBox!.Text,
                     Title = titleTextBox.Text,
                     Description = descriptionTextBox.Text,
                     Office = officeTextBox.Text,
@@ -588,7 +646,7 @@ namespace ADManager
             var ouListBox = new ListBox
             {
                 Width = 400,
-                Height = 150, // Уменьшаем высоту, чтобы уместить список пользователей
+                Height = 150,
                 Font = new Font("Segoe UI", 10),
                 BorderStyle = BorderStyle.FixedSingle
             };
@@ -616,122 +674,13 @@ namespace ADManager
             };
             flowPanel.Controls.Add(usersListBox);
 
-            // Панель для отображения информации о пользователе
-            var userInfoPanel = new FlowLayoutPanel
-            {
-                AutoSize = true,
-                FlowDirection = FlowDirection.TopDown,
-                WrapContents = false,
-                Margin = new Padding(0, 20, 0, 0)
-            };
-
-            // Добавляем метки для отображения информации о пользователе
-            var loginLabel = new Label
-            {
-                Text = "Логин: ",
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                ForeColor = Color.FromArgb(66, 66, 66),
-                AutoSize = true
-            };
-            userInfoPanel.Controls.Add(loginLabel);
-
-            var surnameLabel = new Label
-            {
-                Text = "Фамилия: ",
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                ForeColor = Color.FromArgb(66, 66, 66),
-                AutoSize = true
-            };
-            userInfoPanel.Controls.Add(surnameLabel);
-
-            var givenNameLabel = new Label
-            {
-                Text = "Имя: ",
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                ForeColor = Color.FromArgb(66, 66, 66),
-                AutoSize = true
-            };
-            userInfoPanel.Controls.Add(givenNameLabel);
-
-            var initialsLabel = new Label
-            {
-                Text = "Инициалы: ",
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                ForeColor = Color.FromArgb(66, 66, 66),
-                AutoSize = true
-            };
-            userInfoPanel.Controls.Add(initialsLabel);
-
-            var titleLabel = new Label
-            {
-                Text = "Должность: ",
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                ForeColor = Color.FromArgb(66, 66, 66),
-                AutoSize = true
-            };
-            userInfoPanel.Controls.Add(titleLabel);
-
-            var displayNameLabel = new Label
-            {
-                Text = "Отображаемое имя: ",
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                ForeColor = Color.FromArgb(66, 66, 66),
-                AutoSize = true
-            };
-            userInfoPanel.Controls.Add(displayNameLabel);
-
-            var descriptionLabel = new Label
-            {
-                Text = "Описание: ",
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                ForeColor = Color.FromArgb(66, 66, 66),
-                AutoSize = true
-            };
-            userInfoPanel.Controls.Add(descriptionLabel);
-
-            var officeLabel = new Label
-            {
-                Text = "Комната: ",
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                ForeColor = Color.FromArgb(66, 66, 66),
-                AutoSize = true
-            };
-            userInfoPanel.Controls.Add(officeLabel);
-
-            var telephoneLabel = new Label
-            {
-                Text = "Номер телефона: ",
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                ForeColor = Color.FromArgb(66, 66, 66),
-                AutoSize = true
-            };
-            userInfoPanel.Controls.Add(telephoneLabel);
-
-            var emailLabel = new Label
-            {
-                Text = "Email: ",
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                ForeColor = Color.FromArgb(66, 66, 66),
-                AutoSize = true
-            };
-            userInfoPanel.Controls.Add(emailLabel);
-
-            var webPageLabel = new Label
-            {
-                Text = "Веб-страница: ",
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                ForeColor = Color.FromArgb(66, 66, 66),
-                AutoSize = true
-            };
-            userInfoPanel.Controls.Add(webPageLabel);
-
-            flowPanel.Controls.Add(userInfoPanel);
             panel.Controls.Add(flowPanel);
 
             // Обработчик события выбора подразделения
             ouListBox.SelectedIndexChanged += (s, e) =>
             {
-                usersListBox.Items.Clear(); // Очищаем список пользователей
+                usersListBox.Items.Clear();
+
                 if (ouListBox.SelectedItem == null)
                     return;
 
@@ -744,7 +693,6 @@ namespace ADManager
                         Filter = "(objectClass=user)",
                         SearchScope = SearchScope.Subtree
                     };
-
                     searcher.PropertiesToLoad.Add("sAMAccountName");
                     searcher.PropertiesToLoad.Add("displayName");
 
@@ -759,43 +707,6 @@ namespace ADManager
                 catch (Exception ex)
                 {
                     MessageBox.Show($"Ошибка при получении списка пользователей: {ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-            };
-
-            // Обработчик события выбора пользователя
-            usersListBox.SelectedIndexChanged += async (s, e) =>
-            {
-                if (usersListBox.SelectedItem == null)
-                    return;
-
-                string selectedUser = usersListBox.SelectedItem.ToString();
-                string sAMAccountName = selectedUser.Split('(')[1].TrimEnd(')').Trim();
-
-                try
-                {
-                    var user = _adService.FindUser(sAMAccountName);
-                    if (user == null)
-                    {
-                        MessageBox.Show("Пользователь не найден.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        return;
-                    }
-
-                    // Обновляем метки с информацией о пользователе
-                    loginLabel.Text = $"Логин: {user.SAMAccountName}";
-                    surnameLabel.Text = $"Фамилия: {user.Surname}";
-                    givenNameLabel.Text = $"Имя: {user.GivenName}";
-                    initialsLabel.Text = $"Инициалы: {user.Initials}";
-                    titleLabel.Text = $"Должность: {user.Title}";
-                    displayNameLabel.Text = $"Отображаемое имя: {user.DisplayName}";
-                    descriptionLabel.Text = $"Описание: {user.Description}";
-                    officeLabel.Text = $"Комната: {user.Office}";
-                    telephoneLabel.Text = $"Номер телефона: {user.TelephoneNumber}";
-                    emailLabel.Text = $"Email: {user.Email}";
-                    webPageLabel.Text = $"Веб-страница: {user.WebPage}";
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Ошибка при получении данных пользователя: {ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             };
 
@@ -859,7 +770,7 @@ namespace ADManager
             domainControllerTextBox = new TextBox
             {
                 Width = 200,
-                Text = "",
+                Text = "192.1.3.6",
                 BorderStyle = BorderStyle.FixedSingle
             };
             domainControllerPanel.Controls.Add(domainControllerLabel);
@@ -875,7 +786,7 @@ namespace ADManager
             };
             var baseDnLabel = new Label
             {
-                Text = "BASE DN:",
+                Text = "BASE_DN:",
                 Width = 100,
                 ForeColor = Color.FromArgb(66, 66, 66),
                 Margin = new Padding(0, 5, 10, 0)
@@ -883,7 +794,7 @@ namespace ADManager
             baseDnTextBox = new TextBox
             {
                 Width = 200,
-                Text = "DC=,DC=",
+                Text = "DC=mhp,DC=net",
                 BorderStyle = BorderStyle.FixedSingle
             };
             baseDnPanel.Controls.Add(baseDnLabel);
